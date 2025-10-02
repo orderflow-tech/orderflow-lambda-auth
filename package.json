@@ -1,0 +1,37 @@
+{
+  "name": "orderflow-lambda-auth",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for OrderFlow customer authentication via CPF",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "package": "npm run build && cd dist && zip -r ../lambda.zip .",
+    "clean": "rm -rf dist lambda.zip"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "cognito",
+    "authentication",
+    "jwt"
+  ],
+  "author": "OrderFlow Team",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.540.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.136",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.3"
+  }
+}
