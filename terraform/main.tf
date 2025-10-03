@@ -13,10 +13,11 @@ terraform {
   }
 
   backend "s3" {
-    # Configurar de acordo com seu ambiente
-    # bucket = "orderflow-terraform-state"
-    # key    = "lambda-auth/terraform.tfstate"
-    # region = "us-east-1"
+    bucket         = "orderflow-terraform-state"
+    key            = "lambda-auth/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-state-lock"
   }
 }
 
