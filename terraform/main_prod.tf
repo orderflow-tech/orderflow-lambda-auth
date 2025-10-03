@@ -107,16 +107,56 @@ resource "aws_cognito_user_pool_client" "orderflow" {
   generate_secret = false
 }
 
-# Data source para usar a LabRole existente (AWS LAB)
-data "aws_iam_role" "lab_role" {
-  name = "LabRole"
+# IAM Role para Lambda
+resource "aws_iam_role" "lambda_auth" {
+  name = "${var.project_name}-lambda-auth-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-lambda-auth-role-${var.environment}"
+  }
 }
 
-# Nota: A LabRole do AWS LAB já possui todas as permissões necessárias:
-# - Lambda execution
-# - CloudWatch Logs
-# - Cognito
-# - Secrets Manager
+# Policy para Lambda acessar Cognito
+resource "aws_iam_role_policy" "lambda_cognito" {
+  name = "${var.project_name}-lambda-cognito-policy-${var.environment}"
+  role = aws_iam_role.lambda_auth.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:ListUsers"
+        ]
+        Resource = aws_cognito_user_pool.orderflow.arn
+      }
+    ]
+  })
+}
+
+# Attach AWS managed policy para logs do CloudWatch
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.lambda_auth.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
 
 # CloudWatch Log Group para Lambda
 resource "aws_cloudwatch_log_group" "lambda_auth" {
@@ -143,13 +183,30 @@ resource "aws_secretsmanager_secret_version" "jwt_secret" {
   secret_string = var.jwt_secret
 }
 
-# Nota: A LabRole já tem permissões para Secrets Manager
+# Policy para Lambda acessar Secrets Manager
+resource "aws_iam_role_policy" "lambda_secrets" {
+  name = "${var.project_name}-lambda-secrets-policy-${var.environment}"
+  role = aws_iam_role.lambda_auth.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.jwt_secret.arn
+      }
+    ]
+  })
+}
 
 # Lambda Function
 resource "aws_lambda_function" "auth" {
   filename         = var.lambda_zip_path
   function_name    = "${var.project_name}-auth-${var.environment}"
-  role             = data.aws_iam_role.lab_role.arn
+  role             = aws_iam_role.lambda_auth.arn
   handler          = "index.handler"
   source_code_hash = filebase64sha256(var.lambda_zip_path)
   runtime          = "nodejs20.x"
@@ -158,16 +215,19 @@ resource "aws_lambda_function" "auth" {
 
   environment {
     variables = {
-      USER_POOL_ID      = aws_cognito_user_pool.orderflow.id
-      CLIENT_ID         = aws_cognito_user_pool_client.orderflow.id
-      JWT_SECRET        = var.jwt_secret
-      COGNITO_REGION    = var.aws_region
-      ENVIRONMENT       = var.environment
+      USER_POOL_ID = aws_cognito_user_pool.orderflow.id
+      CLIENT_ID    = aws_cognito_user_pool_client.orderflow.id
+      JWT_SECRET   = var.jwt_secret
+      AWS_REGION   = var.aws_region
+      ENVIRONMENT  = var.environment
     }
   }
 
   depends_on = [
-    aws_cloudwatch_log_group.lambda_auth
+    aws_cloudwatch_log_group.lambda_auth,
+    aws_iam_role_policy_attachment.lambda_logs,
+    aws_iam_role_policy.lambda_cognito,
+    aws_iam_role_policy.lambda_secrets
   ]
 
   tags = {
@@ -242,14 +302,36 @@ resource "aws_api_gateway_stage" "orderflow" {
   rest_api_id   = aws_api_gateway_rest_api.orderflow.id
   stage_name    = var.environment
 
-  # Nota: Logs desabilitados - AWS LAB não permite configurar CloudWatch Logs role para API Gateway
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+    })
+  }
 
   tags = {
     Name = "${var.project_name}-api-stage-${var.environment}"
   }
 }
 
-# Nota: CloudWatch Log Group do API Gateway removido - AWS LAB não suporta
+# CloudWatch Log Group para API Gateway
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/apigateway/${var.project_name}-${var.environment}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name = "${var.project_name}-api-gateway-logs-${var.environment}"
+  }
+}
 
 # CORS Configuration
 resource "aws_api_gateway_method" "auth_options" {

@@ -8,7 +8,7 @@
     "test": "jest",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "package": "npm run build && cd dist && zip -r ../lambda.zip .",
+    "package": "npm run build && cp package*.json dist/ && cd dist && npm ci --production && zip -r ../lambda.zip . && cd .. && rm -rf dist/node_modules dist/package*.json",
     "clean": "rm -rf dist lambda.zip"
   },
   "keywords": [

@@ -13,7 +13,7 @@ import {
 import * as jwt from 'jsonwebtoken';
 
 const cognitoClient = new CognitoIdentityProviderClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.COGNITO_REGION || process.env.AWS_REGION || 'us-east-1',
 });
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
