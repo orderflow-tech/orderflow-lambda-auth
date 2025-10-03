@@ -158,11 +158,11 @@ resource "aws_lambda_function" "auth" {
 
   environment {
     variables = {
-      USER_POOL_ID      = aws_cognito_user_pool.orderflow.id
-      CLIENT_ID         = aws_cognito_user_pool_client.orderflow.id
-      JWT_SECRET        = var.jwt_secret
-      COGNITO_REGION    = var.aws_region
-      ENVIRONMENT       = var.environment
+      USER_POOL_ID   = aws_cognito_user_pool.orderflow.id
+      CLIENT_ID      = aws_cognito_user_pool_client.orderflow.id
+      JWT_SECRET     = var.jwt_secret
+      COGNITO_REGION = var.aws_region
+      ENVIRONMENT    = var.environment
     }
   }
 
