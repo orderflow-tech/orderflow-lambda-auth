@@ -5,7 +5,6 @@ import {
 } from 'aws-lambda';
 import {
   CognitoIdentityProviderClient,
-  InitiateAuthCommand,
   AdminGetUserCommand,
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
@@ -14,11 +13,10 @@ import {
 import * as jwt from 'jsonwebtoken';
 
 const cognitoClient = new CognitoIdentityProviderClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.COGNITO_REGION || process.env.AWS_REGION || 'us-east-1',
 });
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
-const CLIENT_ID = process.env.CLIENT_ID || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key';
 
 interface AuthRequest {
@@ -167,7 +165,7 @@ function generateJWT(cpf: string, userId: string): string {
  */
 export const handler = async (
   event: APIGatewayProxyEvent,
-  context: Context
+  _context: Context
 ): Promise<APIGatewayProxyResult> => {
   console.log('Evento recebido:', JSON.stringify(event, null, 2));
 
